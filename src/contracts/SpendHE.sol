@@ -201,14 +201,20 @@ contract SpendHE is AccessControl {
     using SafeBEP20 for IBEP20;
     IBEP20 public heroesToken;
     bytes32 public constant CREATOR_ADMIN_SERVER = keccak256("CREATOR_ADMIN_SERVER");
-    address public receiveFee = 0xa6f6346fa66e8138ABB19dbB497cf0a7A36c29fb;
-    uint256 public feeClan = 10000000000000000000000; 
-    uint256 public feeEditClan = 100000000000000000000; 
-    uint256 public feeEditName = 50000000000000000000; 
-    constructor( address minter, address _heroesToken ) {
+    address public receiveFee = 0x537f1dcAFB13FEE16Bd2b81EbfC3789DCD15e15f;
+    uint256 public feeClan = 2500000000000000000000; 
+    uint256 public feeEditClan = 25000000000000000000; 
+    uint256 public feeEditName = 12000000000000000000; 
+    uint256 public feeRefreshChallengeStore = 25000000000000000000;
+    uint256 public feeRefreshClanStore = 25000000000000000000;
+    uint256 public unitTimeDeposit = 86400; 
+    uint256 public limitDepositPerDay = 5000*1e18;
+    uint256 public startTimeDeposit;
+    constructor( address minter, address _heroesToken, uint256 _startTime ) {
         _setupRole(DEFAULT_ADMIN_ROLE, _msgSender());
         _setupRole(CREATOR_ADMIN_SERVER, minter);
         heroesToken = IBEP20(_heroesToken); // Token Heroes
+        startTimeDeposit = _startTime;
 	}
     event clanmap(
         address Owner,
@@ -232,28 +238,86 @@ contract SpendHE is AccessControl {
         uint256 fee,
         uint256 timeBuyslot
     );
+    event FeeRefreshChallengeStore(
+        address Owner,
+        uint256 fee,
+        uint256 timeFeeRefreshChallengeStore
+    );
+    event FeeRefreshClanStore(
+        address Owner,
+        uint256 fee,
+        uint256 timeFeeRefreshClanStore
+    );
+    event PurchaseItemDungeon(
+        address Owner,
+        uint256 fee,
+        string item,
+        uint256 timePurchaseItemDungeon
+    );
+    event Deposit(
+        address Owner,
+        uint256 fee,
+        uint256 timeDeposit
+    );
     mapping(uint256 => uint256) public feeUnionBlessing;
     mapping(uint256 => uint256) public feeBuySlot;
+    mapping(uint256 => mapping(address => uint256)) public amountDeposit;
+    function changeLimitDepositPerDay(uint256 _amount) public {
+        require(hasRole(DEFAULT_ADMIN_ROLE, address(msg.sender)), "Caller is not a owner");
+        require(_amount > 0,"amount > 0");
+        limitDepositPerDay = _amount;
+    }
+    function changeStartTimeDeposit(uint256 _time) public {
+        require(hasRole(DEFAULT_ADMIN_ROLE, address(msg.sender)), "Caller is not a owner");
+        require(_time > 0,"time > 0");
+        startTimeDeposit = _time;
+    }
+    function getDepositPerDay(address _address) public view returns(uint256){
+        uint256 unitTime = (block.timestamp - startTimeDeposit).div(unitTimeDeposit);
+        return amountDeposit[unitTime][_address];
+    }
+    function deposit(uint256 _amount) public {
+        require(_amount > 0,"amount > 0");
+        heroesToken.safeTransferFrom(address(msg.sender), address(receiveFee), _amount);
+        uint256 unitTime = (block.timestamp - startTimeDeposit).div(unitTimeDeposit);
+        require(amountDeposit[unitTime][msg.sender].add(_amount) <= limitDepositPerDay, "The limit has been exceeded");
+        amountDeposit[unitTime][msg.sender] = amountDeposit[unitTime][msg.sender].add(_amount);
+        emit Deposit(
+            address(msg.sender),
+            _amount,
+            block.timestamp
+        );
+    }
     function changeReceiveFee(address _receive) public {
         require(hasRole(DEFAULT_ADMIN_ROLE, address(msg.sender)), "Caller is not a owner");
         require(_receive != address(0));
         receiveFee = _receive;
     }
+    function changeFeeRefreshChallengeStore(uint256 _fee) public {
+        require(hasRole(DEFAULT_ADMIN_ROLE, address(msg.sender)), "Caller is not a owner");
+        require(_fee >= 0, 'need fee >= 0');
+        feeRefreshChallengeStore = _fee;
+    }
+     function changeFeeRefreshClanStore(uint256 _fee) public {
+        require(hasRole(DEFAULT_ADMIN_ROLE, address(msg.sender)), "Caller is not a owner");
+        require(_fee >= 0, 'need fee >= 0');
+        feeRefreshClanStore = _fee;
+    }
     function changeFeeClan(uint256 _fee) public {
         require(hasRole(DEFAULT_ADMIN_ROLE, address(msg.sender)), "Caller is not a owner");
-        require(_fee > 0, 'need fee > 0');
+        require(_fee >= 0, 'need fee >= 0');
         feeClan = _fee;
     }
     function changeFeeEditName(uint256 _fee) public {
         require(hasRole(DEFAULT_ADMIN_ROLE, address(msg.sender)), "Caller is not a owner");
-        require(_fee > 0, 'need fee > 0');
+        require(_fee >= 0, 'need fee >= 0');
         feeEditName = _fee;
     }
     function changeFeeEditClan(uint256 _fee) public {
         require(hasRole(DEFAULT_ADMIN_ROLE, address(msg.sender)), "Caller is not a owner");
-        require(_fee > 0, 'need fee > 0');
+        require(_fee >= 0, 'need fee >= 0');
         feeEditClan = _fee;
-    }
+    } 
     function addFeeUnionBlessing(uint256[] memory slot, uint256[] memory amount) public {
         require(hasRole(DEFAULT_ADMIN_ROLE, address(msg.sender)), "Caller is not a owner");
         require(slot.length == amount.length, 'Input not true');
@@ -268,7 +332,32 @@ contract SpendHE is AccessControl {
             feeBuySlot[slot[i]] = amount[i]*1e18;
         }
     }
-    
+    function refreshChallengeStore() public {
+        heroesToken.safeTransferFrom(address(msg.sender), address(receiveFee), feeRefreshChallengeStore);
+        emit FeeRefreshChallengeStore(
+            address(msg.sender),
+            feeRefreshChallengeStore,
+            block.timestamp
+        );
+    }
+    function refreshClanStore() public {
+        heroesToken.safeTransferFrom(address(msg.sender), address(receiveFee), feeRefreshClanStore);
+        emit FeeRefreshClanStore(
+            address(msg.sender),
+            feeRefreshClanStore,
+            block.timestamp
+        );
+    }
+    function purchaseItemDungeon(uint256 _amount, string memory _item) public {
+        require(_amount > 0, "need amount > 0");
+        heroesToken.safeTransferFrom(address(msg.sender), address(receiveFee), _amount);
+        emit PurchaseItemDungeon(
+            msg.sender,
+            _amount,
+            _item,
+            block.timestamp
+        );
+    }
     function clan() public {
         heroesToken.safeTransferFrom(address(msg.sender), address(receiveFee), feeClan);
         emit clanmap(

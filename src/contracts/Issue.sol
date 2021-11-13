@@ -111,7 +111,7 @@ interface IERC721 is IERC165 {
     function isApprovedForAll(address owner, address operator) external view returns (bool);
     function safeTransferFrom( address from, address to, uint256 tokenId, bytes calldata data ) external;
 
-    struct HeroesInfo {uint256 heroesNumber; string name; string race; string class; string tier; string tierBasic; string uri;}
+    struct HeroesInfo {uint256 heroesNumber; string name; string race; string class; string tier; string tierBasic;}
     function getHeroesNumber(uint256 _tokenId) external view returns (HeroesInfo memory);
     function safeMint(address _to, uint256 _tokenId) external;
     function burn(address _from, uint256 _tokenId) external;
@@ -203,11 +203,11 @@ contract Issue is AccessControl {
     IBEP20 public heroesToken;
     bytes32 public constant CREATOR_ADMIN_SERVER = keccak256("CREATOR_ADMIN_SERVER");
     string stringNull = "";
-    uint256 public feeSummon =  200000000000000000000;
-    uint256 public feeSummons = 2000000000000000000000;
+    uint256 public feeSummon =  50000000000000000000;
+    uint256 public feeSummons = 500000000000000000000;
     uint256 public feeShard = 0;
     uint256 public feeCard = 0;
-    address payable receiveFee = payable(0xa6f6346fa66e8138ABB19dbB497cf0a7A36c29fb);
+    address payable receiveFee = payable(0x6a4461548B3f18D98FcC6d6557eB15122611614c);
     constructor( address minter, address _heroesNft, address _heroesToken ) {
         _setupRole(DEFAULT_ADMIN_ROLE, _msgSender());
         _setupRole(CREATOR_ADMIN_SERVER, minter);
@@ -321,7 +321,7 @@ contract Issue is AccessControl {
             _tier,
             'Shard'
         );
-    }
+    } 
     function requestCard(uint256 _tokenId, uint256 _numberHero, string memory _tier) public{
         heroesToken.safeTransferFrom(address(msg.sender), address(receiveFee), feeCard);
         require(queryTierName(_tier) == 1, "Tier not found");

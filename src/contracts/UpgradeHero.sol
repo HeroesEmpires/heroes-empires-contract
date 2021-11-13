@@ -203,7 +203,7 @@ contract UpgradeHero is AccessControl {
     IBEP20 public heroesToken;
     bytes32 public constant CREATOR_ADMIN_SERVER = keccak256("CREATOR_ADMIN_SERVER");
     string stringNull = "";
-    address public receiveFee = 0xa6f6346fa66e8138ABB19dbB497cf0a7A36c29fb;
+    address public receiveFee = 0x6a4461548B3f18D98FcC6d6557eB15122611614c;
     constructor( address minter, address _heroesNft, address _heroesToken ) {
         _setupRole(DEFAULT_ADMIN_ROLE, _msgSender());
         _setupRole(CREATOR_ADMIN_SERVER, minter);
@@ -266,7 +266,7 @@ contract UpgradeHero is AccessControl {
         require(hasRole(DEFAULT_ADMIN_ROLE, address(msg.sender)), "Caller is not a owner");
         for(uint256 i = 0; i < level.length; i++){
             require(amount[i] > 0, 'Amount > 0');
-            amountLimitBreak[level[i]] = amount[i];
+            amountLimitBreak[level[i]] = amount[i]*1e18;
         }
     } 
     function editRuleLimitBreak(uint256 level, uint256 amount) public {
@@ -333,7 +333,7 @@ contract UpgradeHero is AccessControl {
             //Upgrade
             upgrade(listHeroId);
         }
-    }
+    } 
     function upgrade(uint256[] memory listHeroId) internal {
         uint256 heroesTierMain = listHeroId[0]; 
         uint256 tierMain = queryNumberTier(heroesNFT.getHeroesNumber(heroesTierMain).tier);    

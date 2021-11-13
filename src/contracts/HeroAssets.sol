@@ -9,13 +9,13 @@ import "@openzeppelin/contracts/access/AccessControl.sol";
 contract HeroAssets is ERC721, ERC721Enumerable, Pausable, AccessControl {
     bytes32 public constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
     bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
-    string baseURI = "https://metadata-testnet.heroesempires.com/heroes/"; //"https://meta.heroesempires.com/heroes/";
+    string baseURI = "https://metadata.heroesempires.com/heroes/"; //"https://meta.heroesempires.com/heroes/";
     struct HeroesInfo {
         uint256 heroesNumber;
         string name;
         string race;
         string class;
-        string tier;
+        string tier; 
         string tierBasic;
     }
     mapping(uint256 => HeroesInfo) public heroesNumber; // tokenId => Heroes
@@ -23,7 +23,7 @@ contract HeroAssets is ERC721, ERC721Enumerable, Pausable, AccessControl {
         return heroesNumber[_tokenId];
     }
 
-    constructor() ERC721("Hero Assets", "HEA", msg.sender) {
+    constructor() ERC721("Hero Assets", "HEA") {
         _setupRole(DEFAULT_ADMIN_ROLE, msg.sender);
         _setupRole(PAUSER_ROLE, msg.sender);
         _setupRole(MINTER_ROLE, msg.sender);
