@@ -9,7 +9,7 @@ import "@openzeppelin/contracts/access/AccessControl.sol";
 contract HeroAssets is ERC721, ERC721Enumerable, Pausable, AccessControl {
     bytes32 public constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
     bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
-    string baseURI = "https://metadata.heroesempires.com/heroes/"; //"https://meta.heroesempires.com/heroes/";
+    string baseURI = "https://meta.heroesempires.com/heroes/"; //"https://meta.heroesempires.com/heroes/";
     struct HeroesInfo {
         uint256 heroesNumber;
         string name;

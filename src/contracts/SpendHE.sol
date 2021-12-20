@@ -201,7 +201,7 @@ contract SpendHE is AccessControl {
     using SafeBEP20 for IBEP20;
     IBEP20 public heroesToken;
     bytes32 public constant CREATOR_ADMIN_SERVER = keccak256("CREATOR_ADMIN_SERVER");
-    address public receiveFee = 0x537f1dcAFB13FEE16Bd2b81EbfC3789DCD15e15f;
+    address public receiveFee = 0x06eD3d7ef90551333b7185412337c9DF6F17C795;
     uint256 public feeClan = 2500000000000000000000; 
     uint256 public feeEditClan = 25000000000000000000; 
     uint256 public feeEditName = 12000000000000000000; 

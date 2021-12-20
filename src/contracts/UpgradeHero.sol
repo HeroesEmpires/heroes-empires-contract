@@ -203,11 +203,11 @@ contract UpgradeHero is AccessControl {
     IBEP20 public heroesToken;
     bytes32 public constant CREATOR_ADMIN_SERVER = keccak256("CREATOR_ADMIN_SERVER");
     string stringNull = "";
-    address public receiveFee = 0x6a4461548B3f18D98FcC6d6557eB15122611614c;
+    address public receiveFee = 0x06eD3d7ef90551333b7185412337c9DF6F17C795;
     constructor( address minter, address _heroesNft, address _heroesToken ) {
         _setupRole(DEFAULT_ADMIN_ROLE, _msgSender());
         _setupRole(CREATOR_ADMIN_SERVER, minter);
-		heroesNFT = IERC721(_heroesNft); // Token HeroesNFT
+		heroesNFT = IERC721(_heroesNft); // Token Hero Assets
         heroesToken = IBEP20(_heroesToken); // Token Heroes
 	}
     event limitBreak(
@@ -403,5 +403,3 @@ contract UpgradeHero is AccessControl {
         );
     }
 }
- 
-

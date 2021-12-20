@@ -111,7 +111,7 @@ interface IERC721 is IERC165 {
     function isApprovedForAll(address owner, address operator) external view returns (bool);
     function safeTransferFrom( address from, address to, uint256 tokenId, bytes calldata data ) external;
 
-    struct HeroesInfo {uint256 heroesNumber; string name; string race; string class; string tier; string tierBasic;}
+    struct HeroesInfo {uint256 heroesNumber; string name; string race; string class; string tier; string tierBasic; string uri;}
     function getHeroesNumber(uint256 _tokenId) external view returns (HeroesInfo memory);
     function safeMint(address _to, uint256 _tokenId) external;
     function burn(address _from, uint256 _tokenId) external;
@@ -196,174 +196,80 @@ abstract contract AccessControl is Context, IAccessControl, ERC165 {
         }
     }
 }
-contract Issue is AccessControl {
+contract Airdrop is AccessControl {
     using SafeMath for uint;
-    using SafeBEP20 for IBEP20; 
-    IERC721 public heroesNFT;
-    IBEP20 public heroesToken;
-    bytes32 public constant CREATOR_ADMIN_SERVER = keccak256("CREATOR_ADMIN_SERVER");
-    string stringNull = "";
-    uint256 public feeSummon =  50000000000000000000;
-    uint256 public feeSummons = 500000000000000000000;
-    uint256 public feeShard = 0;
-    uint256 public feeCard = 0;
-    address payable receiveFee = payable(0x06eD3d7ef90551333b7185412337c9DF6F17C795);
-    constructor( address minter, address _heroesNft, address _heroesToken ) {
+    using SafeBEP20 for IBEP20;
+    IBEP20 public HE;
+    IBEP20 public Token;
+    bytes32 public constant CREATOR_ADMIN = keccak256("CREATOR_ADMIN");
+    event TransferHe(
+        address owner,
+        uint256 amount,
+        uint256 timeTransfer
+    );
+    constructor( address minter, address _he ) {
         _setupRole(DEFAULT_ADMIN_ROLE, _msgSender());
-        _setupRole(CREATOR_ADMIN_SERVER, minter);
-		heroesNFT = IERC721(_heroesNft); // Token Hero Assets
-        heroesToken = IBEP20(_heroesToken); // Token Heroes
+        _setupRole(CREATOR_ADMIN, minter);
+        HE = IBEP20(_he); // Token Heroes
 	}
-
-    event summonhero(
-        address Owner,
-        uint256 tokenId,
-        string nameHeroes,
-        string race,
-        string tier,
-        string typeIssue
-    );
-    event openpackage(
-        address Owner,
-        uint256 tokenId,
-        string nameHeroes,
-        string race,
-        string tier
-    );
-   
-    struct Heroes {
-        string name;
-        string race;
-        string class;
-        string tier;
-    }
-    event RequestHero(
-        uint256 tokenId,
-        address Owner,
-        string typeIssue
-    );
-    mapping(uint256 => Heroes) public heroes; //  tokenId=> Heroes Information 
-    mapping( uint256 => uint256 ) public amountLimitBreak;
-    mapping(uint256 => bool) public heroOpenPack;
-    mapping(uint256 => bool) public chestId;
-    mapping(uint256 => bool) public summonId;
-    function changeReceiveFee(address _receive) public {
-        require(hasRole(DEFAULT_ADMIN_ROLE, address(msg.sender)), "Caller is not a owner");
-        require(_receive != address(0));
-        receiveFee = payable(_receive);
-    }
-    function addHeroOpenPack(uint256[] memory hero) public {
-        require(hasRole(DEFAULT_ADMIN_ROLE, address(msg.sender)), "Caller is not a owner");
-        for(uint256 i =0; i < hero.length; i++){
-            heroOpenPack[hero[i]] = true;
+    mapping(uint256 => mapping(address => bool)) public whitelistAddress;
+    mapping(uint256 => mapping(address => bool)) public claimed;
+    mapping(uint256 => mapping(address =>uint256)) public amount;
+    mapping(uint256 => bool) public section;
+    mapping(uint256 => uint256) public start;
+    function addWhiteList(uint256 _section, address[] memory _address, uint256[] memory _amount) public {
+        require(hasRole(CREATOR_ADMIN, msg.sender), "Caller is not a admin");
+        require(_address.length == _amount.length, "Input wrong");
+        for(uint256 i = 0; i < _address.length; i++){
+            whitelistAddress[_section][address(_address[i])] = true;
+            amount[_section][address(_address[i])] = _amount[i]*1e18;
         }
-    }
-    function getHeroes(uint256 _id) public view returns (Heroes  memory) {
-        return heroes[_id];
-    }
-    function addHeroes(uint256[] memory id, string[] memory name, string[] memory race, string[] memory class, string[] memory tier) public {
-        require(hasRole(DEFAULT_ADMIN_ROLE, address(msg.sender)), "Caller is not a owner");
-        require(id.length == name.length && id.length == race.length && id.length == class.length && id.length == tier.length, 'Input not true');
-        for(uint256 i = 0; i < name.length ; i ++) {
-            heroes[id[i]] = Heroes(name[i], race[i], class[i], tier[i]);
-        }
-    }
-    function editHeroes(uint256 _id, string memory name, string memory race, string memory class, string memory tier) public {
-        require(hasRole(DEFAULT_ADMIN_ROLE, address(msg.sender)), "Caller is not a owner");
-        heroes[_id].name = name;
-        heroes[_id].race = race;
-        heroes[_id].class = class;
-        heroes[_id].tier = tier;
-    }  
-    function changeFeeShard(uint256 _fee) public {
-        require(hasRole(DEFAULT_ADMIN_ROLE, address(msg.sender)), "Caller is not a owner");
-        require(_fee > 0, 'need fee > 0');
-        feeShard = _fee;
-    }
-    function changeFeeCard(uint256 _fee) public {
-        require(hasRole(DEFAULT_ADMIN_ROLE, address(msg.sender)), "Caller is not a owner");
-        require(_fee > 0, 'need fee > 0');
-        feeCard = _fee;
-    }
-    function changeFee(uint256 _fee) public {
-        require(hasRole(DEFAULT_ADMIN_ROLE, address(msg.sender)), "Caller is not a owner");
-        require(_fee > 0, 'need fee > 0');
-        feeSummon = _fee;
-    }
-    function changeFees(uint256 _fee) public {
-        require(hasRole(DEFAULT_ADMIN_ROLE, address(msg.sender)), "Caller is not a owner");
-        require(_fee > 0, 'need fee > 0');
-        feeSummons = _fee;
-    }
-    function requestShard(uint256 _tokenId) public{
-        heroesToken.safeTransferFrom(address(msg.sender), address(receiveFee), feeShard);
-        emit RequestHero(
-            _tokenId,
-            msg.sender,
-            'Shard'
-        );
     } 
-    function requestCard(uint256 _tokenId) public{
-        heroesToken.safeTransferFrom(address(msg.sender), address(receiveFee), feeCard);
-        emit RequestHero(
-            _tokenId,
+    function setTimeOpen(uint256 _section, uint256 _start) public {
+        require(hasRole(CREATOR_ADMIN, msg.sender), "Caller is not a admin");
+        require(_start > 0, "start > 0");
+        start[_section] = _start;
+        section[_section] = true;
+    }
+    function turnOffSection(uint256 _section) public {
+        require(hasRole(CREATOR_ADMIN, address(msg.sender)), "Caller is not a admin");
+        section[_section] = false;
+    }
+    function changeAmountClaim(uint256 _section, address _address, uint256 _amountClaim) public {
+        require(hasRole(CREATOR_ADMIN, msg.sender), "Caller is not a admin");
+        require(_amountClaim > 0, "amount > 0");
+        amount[_section][address(_address)] = _amountClaim*1e18;
+    }
+
+    function claimHe(uint256 _section) public {
+        require(whitelistAddress[_section][msg.sender],"Not found in whitelist");
+        require(!claimed[_section][msg.sender],"You have claimed tokens");
+        require(block.timestamp >= start[_section], "Please wait until opening time");
+        require(section[_section],"section not found");
+        uint256 amountTransfer = amount[_section][msg.sender];
+        safeHeTransfer(msg.sender, amountTransfer); 
+        claimed[_section][msg.sender] = true;   
+    }
+    function safeHeTransfer(address _to, uint256 _amount) internal {
+        uint256 HEBalance = HE.balanceOf(address(this));
+        uint256 amountTransfer = _amount > HEBalance ? HEBalance : _amount;
+        HE.transfer(_to, amountTransfer);
+        emit TransferHe(
             msg.sender,
-            'Card'
+            amountTransfer,
+            block.timestamp
         );
     }
-    function requestSummon(uint256 _tokenId) public{
-        heroesToken.safeTransferFrom(address(msg.sender), address(receiveFee), feeSummon);
-        emit RequestHero(
-            _tokenId,
-            msg.sender,
-            'Summon'
-        );
+    function Withdraw(uint256 _amount) public {
+        require(hasRole(CREATOR_ADMIN, msg.sender), "Caller is not a admin");
+        safeHeTransfer(msg.sender, _amount);
     }
-    function requestSummons(uint256[] memory _tokenId) public {
-        heroesToken.safeTransferFrom(address(msg.sender), address(receiveFee), feeSummons);
-        for(uint256 i = 0; i < _tokenId.length; i++){
-            emit RequestHero(
-            _tokenId[i],
-            msg.sender,
-            'Summon'
-        );
-        }
+    function WithdrawAnotherToken(address _token, uint256 _amount) public {
+        require(hasRole(CREATOR_ADMIN, msg.sender), "Caller is not a admin");
+        Token = IBEP20(_token);
+        Token.transfer(msg.sender, _amount);
     }
-    function openPackage(address[] memory _owner, uint256[] memory _tokenId, uint256[] memory _numberHero, uint256 packid) public {
-        require(hasRole(CREATOR_ADMIN_SERVER, address(msg.sender)), "Caller is not a admin");
-        require(_owner.length == _numberHero.length && _tokenId.length == _numberHero.length, 'Input not true');
-        require(!chestId[packid], "ChestId has been used");
-        for(uint256 i = 0; i < _tokenId.length; i++){
-            require(heroOpenPack[_numberHero[i]], "Number Hero is not allowed to issue");
-            heroesNFT.safeMint(address(_owner[i]), _tokenId[i]);
-            heroesNFT.addHeroesNumber(_tokenId[i], _numberHero[i], heroes[_numberHero[i]].name, heroes[_numberHero[i]].race, heroes[_numberHero[i]].class, heroes[_numberHero[i]].tier, heroes[_numberHero[i]].tier);
-            emit openpackage(
-                _owner[i], 
-                _tokenId[i],
-                heroes[_numberHero[i]].name,
-                heroes[_numberHero[i]].race,
-                heroes[_numberHero[i]].tier
-            );
-        }
-        chestId[packid] = true;
-    }
-    function summon(address[] memory _owner, uint256[] memory _tokenId, uint256[] memory _numberHero, string[] memory _type, uint256 _summonId) public {
-        require(hasRole(CREATOR_ADMIN_SERVER, address(msg.sender)), "Caller is not a admin");
-        require( _owner.length == _numberHero.length && _tokenId.length == _numberHero.length && _tokenId.length == _type.length, 'Input not true');
-        require(!summonId[_summonId], "ChestId has been used");    
-        for(uint256 i = 0; i < _tokenId.length; i++){
-            require(keccak256(bytes(heroes[_numberHero[i]].name)) != keccak256(bytes(stringNull)), "Heroes not found");
-            heroesNFT.safeMint(address(_owner[i]), _tokenId[i]);
-            heroesNFT.addHeroesNumber(_tokenId[i], _numberHero[i], heroes[_numberHero[i]].name, heroes[_numberHero[i]].race, heroes[_numberHero[i]].class, heroes[_numberHero[i]].tier, heroes[_numberHero[i]].tier);
-            emit summonhero(
-                _owner[i],
-                _tokenId[i],
-                heroes[_numberHero[i]].name,
-                heroes[_numberHero[i]].race,
-                heroes[_numberHero[i]].tier,
-                _type[i]
-            );
-        }
-        summonId[_summonId] = true;
-    }
+   
 }
+ 
+
