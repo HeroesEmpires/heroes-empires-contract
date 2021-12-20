@@ -204,7 +204,6 @@ contract Stake is AccessControl {
     struct UserInfo {  
         uint256 amount;     // How many HE tokens the user has provided.
         uint256 rewardDebt; // Reward debt. See explanation below.
-        uint256 pendingDebt;
     }
     uint256 public timeLockWithdraw = 259200;
     uint256 public timeLockClaim = 259200;
@@ -375,8 +374,8 @@ contract Stake is AccessControl {
         if (user.amount > 0) {
             uint256 pending = user.amount.mul(pool.accHePerShare).div(1e18).sub(user.rewardDebt);
             if(pending > 0){
-                user.pendingDebt = user.pendingDebt.add(pending);
-                // claimInfo[_pid][msg.sender].push(ClaimInfo(pending, block.timestamp, 0)); 
+                // safeHeTransfer(msg.sender, pending);
+                claimInfo[_pid][msg.sender].push(ClaimInfo(pending, block.timestamp, 0)); 
                 // emit Claim(msg.sender, _pid, pending, pendingnfl, block.timestamp);
             }
         } 
@@ -401,8 +400,7 @@ contract Stake is AccessControl {
         user.rewardDebt = user.amount.mul(pool.accHePerShare).div(1e18);
         pool.balancePool = pool.balancePool.sub(_amount);
         withdrawInfo[_pid][msg.sender].push(WithdrawInfo(_amount, block.timestamp, 0)); 
-        user.pendingDebt = user.pendingDebt.add(pending);
-        // claimInfo[_pid][msg.sender].push(ClaimInfo(pending, block.timestamp, 0)); 
+        claimInfo[_pid][msg.sender].push(ClaimInfo(pending, block.timestamp, 0)); 
         // emit Withdraw(msg.sender, _pid, _amount, block.timestamp);
         // emit Claim(msg.sender, _pid, pending, block.timestamp);
     }
@@ -419,16 +417,14 @@ contract Stake is AccessControl {
         pool.heToken.safeTransfer(address(msg.sender), amount);
         emit Withdraw(msg.sender, _pid, amount, block.timestamp);
     }
-    function pendingClaim(uint256 _pid, uint256 _amount) public {
+    function pendingClaim(uint256 _pid) public {
         PoolInfo storage pool = poolInfo[_pid];
         UserInfo storage user = userInfo[_pid][msg.sender];
         require(user.amount >= 0, "withdraw: not good");
         updatePool(_pid);
         uint256 pending = user.amount.mul(pool.accHePerShare).div(1e18).sub(user.rewardDebt);
         user.rewardDebt = user.amount.mul(pool.accHePerShare).div(1e18);
-        require(user.pendingDebt.add(pending) >= _amount, "Claim: not good");
-        user.pendingDebt = user.pendingDebt.add(pending).sub(_amount);
-        claimInfo[_pid][msg.sender].push(ClaimInfo(_amount, block.timestamp, 0)); 
+        claimInfo[_pid][msg.sender].push(ClaimInfo(pending, block.timestamp, 0)); 
         // emit Claim(msg.sender, _pid, pending, block.timestamp);
     }
     function claim(uint256 _pid, uint256 _id) public {
@@ -442,18 +438,17 @@ contract Stake is AccessControl {
         safeHeTransfer(address(msg.sender), amount);
         emit Claim(msg.sender, _pid, amount, block.timestamp);
     }
-    function reInvestment(uint256 _pid, uint256 _amount) public {
+    function reInvestment(uint256 _pid) public {
         PoolInfo storage pool = poolInfo[_pid];
         UserInfo storage user = userInfo[_pid][msg.sender];
         require(user.amount >= 0, "amount: not good");
         updatePool(_pid);
         uint256 pending = user.amount.mul(pool.accHePerShare).div(1e18).sub(user.rewardDebt);
-        require(user.pendingDebt.add(pending) >= _amount, "Claim: not good");
-        user.pendingDebt = user.pendingDebt.add(pending).sub(_amount);
+        require(pending > 0,"claim: not good");
         user.rewardDebt = user.amount.mul(pool.accHePerShare).div(1e18);
-        pool.balancePool = pool.balancePool.add(_amount);
-        user.amount = user.amount.add(_amount);
-        emit ReInvestment(msg.sender, _pid, _amount, block.timestamp);
+        pool.balancePool = pool.balancePool.add(pending);
+        user.amount = user.amount.add(pending);
+        emit ReInvestment(msg.sender, _pid, pending, block.timestamp);
         // claimInfo[_pid][msg.sender].push(ClaimInfo(_amount, block.timestamp, 0)); 
     }
     // Withdraw without caring about rewards. EMERGENCY ONLY.
