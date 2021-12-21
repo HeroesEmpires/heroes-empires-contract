@@ -270,9 +270,9 @@ contract Stake is AccessControl {
         require(hasRole(DEFAULT_ADMIN_ROLE, address(msg.sender)), "Caller is not a owner");
         timeLockClaim = _timeLock;
     }
-    function changeHePerBlock(uint256 _hePerBlock, uint256 _pid) public {
+    function changeHePerBlock(uint256 _hePerBlock) public {
         require(hasRole(DEFAULT_ADMIN_ROLE, address(msg.sender)), "Caller is not a owner");
-        updatePool(_pid);
+        massUpdatePools();
         HePerBlock = _hePerBlock;
     }
     function getWithdrawByAddress(uint256 _pid, address _address) public view returns (WithdrawInfo[]  memory) {
@@ -445,9 +445,9 @@ contract Stake is AccessControl {
         updatePool(_pid);
         uint256 pending = user.amount.mul(pool.accHePerShare).div(1e18).sub(user.rewardDebt);
         require(pending > 0,"claim: not good");
-        user.rewardDebt = user.amount.mul(pool.accHePerShare).div(1e18);
         pool.balancePool = pool.balancePool.add(pending);
         user.amount = user.amount.add(pending);
+        user.rewardDebt = user.amount.mul(pool.accHePerShare).div(1e18);
         emit ReInvestment(msg.sender, _pid, pending, block.timestamp);
         // claimInfo[_pid][msg.sender].push(ClaimInfo(_amount, block.timestamp, 0)); 
     }
