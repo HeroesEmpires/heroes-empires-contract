@@ -196,15 +196,22 @@ abstract contract AccessControl is Context, IAccessControl, ERC165 {
         }
     }
 }
+interface Reward { 
+	function transferToken(IBEP20 _token, address _to, uint256 _amount) external;
+}
 contract Stake is AccessControl {
     using SafeMath for uint;
     using SafeBEP20 for IBEP20;
     IBEP20 public HE;
+    Reward public RE;
     bytes32 public constant CREATOR_ADMIN = keccak256("CREATOR_ADMIN");
     struct UserInfo {  
         uint256 amount;     // How many HE tokens the user has provided.
         uint256 rewardDebt; // Reward debt. See explanation below.
+        uint256 pendingDebt;
     }
+    mapping(uint256 => mapping(address => bool)) public boolAddWallet;
+    mapping(uint256 => mapping(address => address)) public addressStake;
     uint256 public timeLockWithdraw = 259200;
     uint256 public timeLockClaim = 259200;
     uint256 public bonusEndBlock;
@@ -244,19 +251,22 @@ contract Stake is AccessControl {
     event Claim(address indexed user, uint256 indexed pid, uint256 reward, uint256 blockTime);
     event EmergencyWithdraw(address indexed user, uint256 indexed pid, uint256 amount, uint256 blockTime);
     event ReInvestment(address indexed user, uint256 indexed pid, uint256 reInvestment, uint256 blockTime);
+    event AddWallet(address indexed user, uint256 indexed pid, address Walletreceive, uint256 blockTime);
     constructor(
         address minter,
         address _HE,
         uint256 _hePerBlock,
         uint256 _startBlock,
-        uint256 _bonusEndBlock
+        uint256 _bonusEndBlock,
+        address _reward
     ) public {
         _setupRole(DEFAULT_ADMIN_ROLE, _msgSender());
         _setupRole(CREATOR_ADMIN, minter);
         HE = IBEP20(_HE);
         HePerBlock = _hePerBlock;
         startBlock = _startBlock;
-        bonusEndBlock = _bonusEndBlock;       
+        bonusEndBlock = _bonusEndBlock;  
+        RE = Reward(_reward);
     }
     function poolLength() external view returns (uint256) {
         return poolInfo.length;
@@ -305,8 +315,19 @@ contract Stake is AccessControl {
         totalAllocPoint = totalAllocPoint.sub(poolInfo[_pid].allocPoint).add(_allocPoint);
         poolInfo[_pid].allocPoint = _allocPoint;
     }
-
-     // Return reward multiplier over the given _from to _to block.
+    function addViewWallet(uint256 _pid, address _receive) public{
+        require(!boolAddWallet[_pid][_receive], "Wallet has been added");
+        addressStake[_pid][address(_receive)] = msg.sender;
+        boolAddWallet[_pid][_receive] = true;
+        emit AddWallet(msg.sender, _pid, address(_receive), block.timestamp);
+    }
+    function getViewWallet(uint256 _pid, address _receive) public view returns (uint256){
+        address staker = addressStake[_pid][_receive];
+        UserInfo storage user = userInfo[_pid][staker];
+        uint256 amount = user.amount;
+        return amount;
+    }
+    // Return reward multiplier over the given _from to _to block.
     function getMultiplier(uint256 _from, uint256 _to) public view returns (uint256) {
         if (_to <= bonusEndBlock) {
             return _to.sub(_from).mul(BONUS_MULTIPLIER);
@@ -326,7 +347,7 @@ contract Stake is AccessControl {
             return 0;
         }
     }
-     // View function to see pending Lucky on frontend.
+    // View function to see pending Lucky on frontend.
     function pendingToken(uint256 _pid, address _user) external view returns (uint256) {
         PoolInfo storage pool = poolInfo[_pid];
         UserInfo storage user = userInfo[_pid][_user];
@@ -338,10 +359,10 @@ contract Stake is AccessControl {
             uint256 heReward = multiplier.mul(rewardThisBlock).mul(pool.allocPoint).div(totalAllocPoint);
             accHePerShare = accHePerShare.add(heReward.mul(1e18).div(lpSupply));
         }
-        uint256 rewardHe = user.amount.mul(accHePerShare).div(1e18).sub(user.rewardDebt);
+        uint256 rewardHe = user.amount.mul(accHePerShare).div(1e18).sub(user.rewardDebt).add(user.pendingDebt);
         return rewardHe;
     }
-     // Update reward vairables for all pools. Be careful of gas spending!
+    // Update reward vairables for all pools. Be careful of gas spending!
     function massUpdatePools() public {
         uint256 length = poolInfo.length;
         for (uint256 pid = 0; pid < length; ++pid) {
@@ -349,7 +370,7 @@ contract Stake is AccessControl {
         }
     }
 
-     // Update reward variables of the given pool to be up-to-date.
+    // Update reward variables of the given pool to be up-to-date.
     function updatePool(uint256 _pid) public {
         PoolInfo storage pool = poolInfo[_pid];
         if (block.number <= pool.lastRewardBlock) {
@@ -374,8 +395,8 @@ contract Stake is AccessControl {
         if (user.amount > 0) {
             uint256 pending = user.amount.mul(pool.accHePerShare).div(1e18).sub(user.rewardDebt);
             if(pending > 0){
-                // safeHeTransfer(msg.sender, pending);
-                claimInfo[_pid][msg.sender].push(ClaimInfo(pending, block.timestamp, 0)); 
+                user.pendingDebt = user.pendingDebt.add(pending);
+                // claimInfo[_pid][msg.sender].push(ClaimInfo(pending, block.timestamp, 0)); 
                 // emit Claim(msg.sender, _pid, pending, pendingnfl, block.timestamp);
             }
         } 
@@ -400,7 +421,8 @@ contract Stake is AccessControl {
         user.rewardDebt = user.amount.mul(pool.accHePerShare).div(1e18);
         pool.balancePool = pool.balancePool.sub(_amount);
         withdrawInfo[_pid][msg.sender].push(WithdrawInfo(_amount, block.timestamp, 0)); 
-        claimInfo[_pid][msg.sender].push(ClaimInfo(pending, block.timestamp, 0)); 
+        user.pendingDebt = user.pendingDebt.add(pending);
+        // claimInfo[_pid][msg.sender].push(ClaimInfo(pending, block.timestamp, 0)); 
         // emit Withdraw(msg.sender, _pid, _amount, block.timestamp);
         // emit Claim(msg.sender, _pid, pending, block.timestamp);
     }
@@ -417,14 +439,16 @@ contract Stake is AccessControl {
         pool.heToken.safeTransfer(address(msg.sender), amount);
         emit Withdraw(msg.sender, _pid, amount, block.timestamp);
     }
-    function pendingClaim(uint256 _pid) public {
+    function pendingClaim(uint256 _pid, uint256 _amount) public {
         PoolInfo storage pool = poolInfo[_pid];
         UserInfo storage user = userInfo[_pid][msg.sender];
         require(user.amount >= 0, "withdraw: not good");
         updatePool(_pid);
         uint256 pending = user.amount.mul(pool.accHePerShare).div(1e18).sub(user.rewardDebt);
         user.rewardDebt = user.amount.mul(pool.accHePerShare).div(1e18);
-        claimInfo[_pid][msg.sender].push(ClaimInfo(pending, block.timestamp, 0)); 
+        require(user.pendingDebt.add(pending) >= _amount, "Claim: not good");
+        user.pendingDebt = user.pendingDebt.add(pending).sub(_amount);
+        claimInfo[_pid][msg.sender].push(ClaimInfo(_amount, block.timestamp, 0)); 
         // emit Claim(msg.sender, _pid, pending, block.timestamp);
     }
     function claim(uint256 _pid, uint256 _id) public {
@@ -435,40 +459,34 @@ contract Stake is AccessControl {
         require(amount >= 0 , 'withdraw: not good');
         require((block.timestamp - timeWithdraw) > timeLockClaim, 'you are still in lock');
         claimInfo[_pid][msg.sender][_id].status = 1;
-        safeHeTransfer(address(msg.sender), amount);
+        // safeHeTransfer(address(msg.sender), amount);
+        RE.transferToken(HE,address(msg.sender), amount);
         emit Claim(msg.sender, _pid, amount, block.timestamp);
     }
-    function reInvestment(uint256 _pid) public {
+    function reInvestment(uint256 _pid, uint256 _amount) public {
         PoolInfo storage pool = poolInfo[_pid];
         UserInfo storage user = userInfo[_pid][msg.sender];
         require(user.amount >= 0, "amount: not good");
         updatePool(_pid);
         uint256 pending = user.amount.mul(pool.accHePerShare).div(1e18).sub(user.rewardDebt);
-        require(pending > 0,"claim: not good");
-        pool.balancePool = pool.balancePool.add(pending);
-        user.amount = user.amount.add(pending);
+        require(user.pendingDebt.add(pending) >= _amount, "Claim: not good");
+        user.pendingDebt = user.pendingDebt.add(pending).sub(_amount);
+        pool.balancePool = pool.balancePool.add(_amount);
+        user.amount = user.amount.add(_amount);
         user.rewardDebt = user.amount.mul(pool.accHePerShare).div(1e18);
-        emit ReInvestment(msg.sender, _pid, pending, block.timestamp);
+        RE.transferToken(HE,address(this), _amount);
+        emit ReInvestment(msg.sender, _pid, _amount, block.timestamp);
         // claimInfo[_pid][msg.sender].push(ClaimInfo(_amount, block.timestamp, 0)); 
     }
     // Withdraw without caring about rewards. EMERGENCY ONLY.
     function emergencyWithdraw(uint256 _pid) public {
         PoolInfo storage pool = poolInfo[_pid];
         UserInfo storage user = userInfo[_pid][msg.sender];
-        pool.heToken.safeTransfer(address(msg.sender), user.amount);
+        // pool.heToken.safeTransfer(address(msg.sender), user.amount);
+        withdrawInfo[_pid][msg.sender].push(WithdrawInfo(user.amount, block.timestamp, 0));
         pool.balancePool = pool.balancePool.sub(user.amount);
         emit EmergencyWithdraw(msg.sender, _pid, user.amount, block.timestamp);
         user.amount = 0;
         user.rewardDebt = 0;
     }
-     // Safe lucky transfer function, just in case if rounding error causes pool to not have enough LUCKY.
-    function safeHeTransfer(address _to, uint256 _amount) internal {
-        uint256 he = HE.balanceOf(address(this));
-        if (_amount > he) {
-            HE.transfer(_to, he);
-        } else {
-            HE.transfer(_to, _amount);
-        }
-    }
-
 }
