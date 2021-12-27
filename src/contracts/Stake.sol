@@ -467,6 +467,7 @@ contract Stake is AccessControl {
         PoolInfo storage pool = poolInfo[_pid];
         UserInfo storage user = userInfo[_pid][msg.sender];
         require(user.amount >= 0, "amount: not good");
+        require(pool.heToken == HE, "Token does not support restake");
         updatePool(_pid);
         uint256 pending = user.amount.mul(pool.accHePerShare).div(1e18).sub(user.rewardDebt);
         require(user.pendingDebt.add(pending) >= _amount, "Claim: not good");
