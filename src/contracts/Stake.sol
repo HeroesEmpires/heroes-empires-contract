@@ -442,5 +442,6 @@ contract Stake is AccessControl {
         emit EmergencyWithdraw(msg.sender, _pid, user.amount, block.timestamp);
         user.amount = 0;
         user.rewardDebt = 0;
+        user.pendingDebt = 0;
     }
 }
