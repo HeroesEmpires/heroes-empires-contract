@@ -19,7 +19,7 @@ contract HeroAssets is ERC721, ERC721Enumerable, Pausable, AccessControl {
         string tierBasic;
     }
     mapping(uint256 => HeroesInfo) public heroesNumber; // tokenId => Heroes
-    function getHeroesNumber(uint256 _tokenId) public view returns(HeroesInfo memory) {
+    function getHeroesNumber(uint256 _tokenId) external view returns(HeroesInfo memory) {
         return heroesNumber[_tokenId];
     }
 
@@ -32,32 +32,32 @@ contract HeroAssets is ERC721, ERC721Enumerable, Pausable, AccessControl {
     function _baseURI() internal view virtual override returns (string memory) {
         return baseURI;
     }
-    function setBaseURI(string memory _baseUri) public onlyRole(DEFAULT_ADMIN_ROLE){
+    function setBaseURI(string memory _baseUri) external onlyRole(DEFAULT_ADMIN_ROLE){
         baseURI = _baseUri;
     }
 
-    function pause() public onlyRole(PAUSER_ROLE) {
+    function pause() external onlyRole(PAUSER_ROLE) {
         _pause();
     }
 
-    function unpause() public onlyRole(PAUSER_ROLE) {
+    function unpause() external onlyRole(PAUSER_ROLE) {
         _unpause();
     }
 
-    function safeMint(address to, uint256 tokenId) public onlyRole(MINTER_ROLE) {
+    function safeMint(address to, uint256 tokenId) external onlyRole(MINTER_ROLE) {
         _safeMint(to, tokenId);
     }
-    function burn(address owner, uint256 tokenId) public onlyRole(MINTER_ROLE) {
+    function burn(address owner, uint256 tokenId) external onlyRole(MINTER_ROLE) {
         require(ownerOf(tokenId) == owner, "ERC721: burn of token that is not own" );
         _burn(tokenId);
     }
-    function editTier(uint256 tokenId, string memory _tier) public onlyRole(MINTER_ROLE) {
+    function editTier(uint256 tokenId, string memory _tier) external onlyRole(MINTER_ROLE) {
         heroesNumber[tokenId].tier = _tier;
     }
-    function addHeroesNumber(uint256 tokenId, uint256 _heroesNumber, string memory name, string memory race, string memory class, string memory tier, string memory tierBasic) public onlyRole(MINTER_ROLE) {
+    function addHeroesNumber(uint256 tokenId, uint256 _heroesNumber, string memory name, string memory race, string memory class, string memory tier, string memory tierBasic) external onlyRole(MINTER_ROLE) {
         heroesNumber[tokenId] = HeroesInfo( _heroesNumber, name, race, class, tier, tierBasic);
     }
-    function deleteHeroesNumber(uint256 tokenId) public onlyRole(MINTER_ROLE) {
+    function deleteHeroesNumber(uint256 tokenId) external onlyRole(MINTER_ROLE) {
         delete heroesNumber[tokenId];
     }
     function _beforeTokenTransfer(address from, address to, uint256 tokenId)

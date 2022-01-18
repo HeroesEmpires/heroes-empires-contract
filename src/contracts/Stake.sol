@@ -12,7 +12,7 @@ interface IBEP20 {
 	function removeOperator(address minter) external returns (bool);
 	event Transfer(address indexed from, address indexed to, uint256 value);
 	event Approval( address indexed owner, address indexed spender, uint256 value );
-}
+} 
 library SafeBEP20 {
     using SafeMath for uint256;
     using Address for address;
@@ -132,15 +132,15 @@ abstract contract AccessControl is Context, IAccessControl, ERC165 {
     }
     function hasRole(bytes32 role, address account) public view override returns (bool) { return _roles[role].members[account]; }
     function getRoleAdmin(bytes32 role) public view override returns (bytes32) { return _roles[role].adminRole; }
-    function grantRole(bytes32 role, address account) public virtual override { 
+    function grantRole(bytes32 role, address account) external virtual override { 
         require( hasRole(getRoleAdmin(role), _msgSender()), "AccessControl: sender must be an admin to grant");
         _grantRole(role, account);
     }
-    function revokeRole(bytes32 role, address account) public virtual override {
+    function revokeRole(bytes32 role, address account) external virtual override {
         require( hasRole(getRoleAdmin(role), _msgSender()), "AccessControl: sender must be an admin to revoke");
         _revokeRole(role, account);
     }
-    function renounceRole(bytes32 role, address account) public virtual override
+    function renounceRole(bytes32 role, address account) external virtual override
     {
         require( account == _msgSender(), "AccessControl: can only renounce roles for self" );
         _revokeRole(role, account);
@@ -252,10 +252,10 @@ contract Stake is AccessControl {
         massUpdatePools();
         HePerBlock = _hePerBlock;
     }
-    function getWithdrawByAddress(uint256 _pid, address _address) public view returns (WithdrawInfo[]  memory) {
+    function getWithdrawByAddress(uint256 _pid, address _address) external view returns (WithdrawInfo[]  memory) {
         return withdrawInfo[_pid][_address];
     }
-    function getClaimByAddress(uint256 _pid, address _address) public view returns (ClaimInfo[]  memory) {
+    function getClaimByAddress(uint256 _pid, address _address) external view returns (ClaimInfo[]  memory) {
         return claimInfo[_pid][_address];
     }
     function add(uint256 _allocPoint, IBEP20 _heToken, bool _withUpdate) external {
@@ -288,7 +288,7 @@ contract Stake is AccessControl {
         boolAddWallet[_pid][_receive] = true;
         emit AddWallet(msg.sender, _pid, address(_receive), block.timestamp);
     }
-    function getViewWallet(uint256 _pid, address _receive) public view returns (uint256){
+    function getViewWallet(uint256 _pid, address _receive) external view returns (uint256){
         address staker = addressStake[_pid][_receive];
         UserInfo storage user = userInfo[_pid][staker];
         uint256 amount = user.amount;
@@ -315,7 +315,7 @@ contract Stake is AccessControl {
         }
     }
     // View function to see pending Lucky on frontend.
-    function pendingToken(uint256 _pid, address _user) public view returns (uint256) {
+    function pendingToken(uint256 _pid, address _user) external view returns (uint256) {
         PoolInfo storage pool = poolInfo[_pid];
         UserInfo storage user = userInfo[_pid][_user];
         uint256 accHePerShare = pool.accHePerShare;
