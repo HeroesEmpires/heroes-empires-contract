@@ -29,9 +29,6 @@ contract HeroAssets is ERC721, ERC721Enumerable, Pausable, AccessControl {
         _setupRole(MINTER_ROLE, msg.sender);
     }
     
-    function _baseURI() internal view virtual override returns (string memory) {
-        return baseURI;
-    }
     function setBaseURI(string memory _baseUri) external onlyRole(DEFAULT_ADMIN_ROLE){
         baseURI = _baseUri;
     }
